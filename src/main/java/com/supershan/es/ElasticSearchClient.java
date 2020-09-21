@@ -621,7 +621,7 @@ public class ElasticSearchClient {
 
     public static void main(String[] args) throws IOException {
         // 创建索引
-        //createIndex();
+        createIndex();
 
         // 创建Doc
         //putDoc();
