@@ -2,6 +2,8 @@ package com.supershan.es;
 
 import org.apache.http.HttpHost;
 import org.elasticsearch.action.ActionListener;
+import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
+import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
@@ -16,8 +18,10 @@ import org.elasticsearch.action.support.WriteRequest;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.VersionType;
@@ -26,6 +30,8 @@ import org.elasticsearch.index.query.TermQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 import org.elasticsearch.search.sort.SortBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
@@ -35,7 +41,9 @@ import java.util.concurrent.TimeUnit;
  *
  * @author mac
  */
-public class ElasticSearchClient {
+public class ElasticSearchUtil {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ElasticSearchUtil.class);
+
     private String[] hostsAndPorts;
     private RestHighLevelClient client;
 
@@ -47,7 +55,7 @@ public class ElasticSearchClient {
         this.client = client;
     }
 
-    public ElasticSearchClient(String[] hostsAndPorts) {
+    public ElasticSearchUtil(String[] hostsAndPorts) {
         this.hostsAndPorts = hostsAndPorts;
 
         List<HttpHost> httpHosts = new ArrayList<HttpHost>();
@@ -74,12 +82,27 @@ public class ElasticSearchClient {
         }
     }
 
-    private IndexRequest getIndexRequest(String index) {
+    public boolean createIndex(String index) {
+        CreateIndexRequest request = new CreateIndexRequest(index);
+        try {
+            CreateIndexResponse indexResponse = getClient().indices().create(request, RequestOptions.DEFAULT);
+
+            return indexResponse.isAcknowledged();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+
+
+    private IndexRequest getIndexRequest(String index, String docId) {
         IndexRequest indexRequest = null;
         if (null == index) {
             throw new ElasticsearchException("index must not be null");
         } else {
-            indexRequest = new IndexRequest(index);
+            indexRequest = new IndexRequest(index).id(docId);
         }
         return indexRequest;
     }
@@ -92,8 +115,8 @@ public class ElasticSearchClient {
      * @param dataMap
      * @throws IOException
      */
-    public IndexResponse execIndex(String index, Map<String, Object> dataMap) throws IOException {
-        return getClient().index(getIndexRequest(index).source(dataMap), RequestOptions.DEFAULT);
+    public IndexResponse execIndex(String index, String docId, Map<String, Object> dataMap) throws IOException {
+        return getClient().index(getIndexRequest(index, docId).source(dataMap), RequestOptions.DEFAULT);
     }
 
     /**
@@ -104,9 +127,28 @@ public class ElasticSearchClient {
      * @param indexResponseActionListener
      * @throws IOException
      */
-    public void asyncExecIndex(String index, Map<String, Object> dataMap, ActionListener<IndexResponse> indexResponseActionListener) throws IOException {
-        getClient().indexAsync(getIndexRequest(index).source(dataMap), RequestOptions.DEFAULT, indexResponseActionListener);
+    public void asyncExecIndex(String index, String docId, Map<String, Object> dataMap, ActionListener<IndexResponse> indexResponseActionListener) throws IOException {
+        getClient().indexAsync(getIndexRequest(index, docId).source(dataMap), RequestOptions.DEFAULT, indexResponseActionListener);
     }
+
+
+    /**
+     * 检查索引
+     * @param index
+     * @return
+     * @throws IOException
+     */
+    public boolean checkIndexExist(String index) {
+        try {
+            GetIndexRequest request = new GetIndexRequest(index);
+            boolean isExists = getClient().indices().exists(request, RequestOptions.DEFAULT);
+            return isExists;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
 
     /**
      * @param index
@@ -506,7 +548,7 @@ public class ElasticSearchClient {
      * @param termQueryBuilder
      * @param matchQueryBuilder
      * @param sortBuilder
-     * @param fetchSource       开关
+     * @param fetchSource  开关
      * @return
      * @throws IOException
      */

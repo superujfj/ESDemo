@@ -29,12 +29,15 @@ import java.util.*;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
+/**
+ * @author mac
+ */
 public class TransportClientTest {
     private static TransportClient client;
 
     static {
         try {
-            client = new ClientUtil().CreateClient();
+            client = new ClientUtil().createClient();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -88,7 +91,7 @@ public class TransportClientTest {
     public static void BulkCreateIndex() {
         BulkRequestBuilder builder = client.prepareBulk();
         for (int i = 0; i < 10; i++) {
-            HashMap<String, Object> map = new HashMap<String, Object>();
+            HashMap<String, Object> map = new HashMap<String, Object>(16);
             map.put("recordtime", "11");
             map.put("area", "22");
             map.put("usertype", "33");
@@ -195,7 +198,10 @@ public class TransportClientTest {
         CreateIndex1();
     }
 
-    //这个方法是为上一步创建的索引中添加内容，包括id，id不能重复
+    /**
+     * 这个方法是为上一步创建的索引中添加内容，包括id，id不能重复
+     */
+
     public static void CreateIndex1() throws IOException {
         //索引，类型，id
         IndexResponse response = client.prepareIndex("my_index", "_doc", "1")
@@ -223,7 +229,10 @@ public class TransportClientTest {
                 )).get();
     }
 
-    //再插入一条数据
+    /**再插入一条数据
+     *
+     * @throws IOException
+     */
     public static void createIndex2() throws IOException {
         IndexResponse response = client.prepareIndex("my_index", "_doc", "2")
                 .setSource(jsonBuilder()

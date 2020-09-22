@@ -12,7 +12,7 @@ import java.net.InetAddress;
  */
 public class ClientUtil {
     private static TransportClient client;
-    public TransportClient CreateClient() throws Exception {
+    public TransportClient createClient() throws Exception {
         // 先构建client
         System.out.println("开始创建client");
         Settings settings=Settings.builder()
