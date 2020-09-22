@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  *
+ * @author mac
  */
 public class ElasticSearchClient {
     private String[] hostsAndPorts;
@@ -64,7 +65,13 @@ public class ElasticSearchClient {
     }
 
     public void close() throws IOException {
-        this.client.close();
+        if (client != null) {
+            try {
+                client.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     private IndexRequest getIndexRequest(String index) {
@@ -473,7 +480,6 @@ public class ElasticSearchClient {
         return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, null, null, sortBuilder, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
     }
 
-
     /**
      * 支持排序
      *
@@ -583,54 +589,5 @@ public class ElasticSearchClient {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
         getClient().searchAsync(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, termQueryBuilder, sortField, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT, listener);
-    }
-
-    /**
-     * 创建索引
-     */
-
-    public static void createIndex() throws IOException {
-
-        ElasticSearchClient esClient = new ElasticSearchClient(null);
-
-        try {
-            String index = "users";
-            Map<String, Object> jsonMap = new HashMap<>();
-            jsonMap.put("id", "1");
-            jsonMap.put("name", "A");
-            jsonMap.put("subject", "Chinese");
-            jsonMap.put("score", 90);
-            jsonMap.put("password", "A2020");
-
-            IndexResponse response = esClient.execIndex(index, jsonMap);
-            System.out.println("index: " + response.getIndex());
-            System.out.println("id: " + response.getId());
-            System.out.println("version: " + response.getVersion());
-        } finally {
-            esClient.close();
-        }
-    }
-
-    public static void getDoc() throws IOException{
-
-    }
-
-    public static void putDoc() throws IOException{
-
-    }
-
-    public static void main(String[] args) throws IOException {
-        // 创建索引
-        createIndex();
-
-        // 创建Doc
-        //putDoc();
-
-        // 查找Doc
-        // getDoc()
-
-        // 查找Doc
-        // searchDoc()
-
     }
 }

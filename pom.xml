@@ -19,6 +19,7 @@
             </plugin>
         </plugins>
     </build>
+
     <dependencies>
         <dependency>
             <groupId>org.elasticsearch.client</groupId>
@@ -43,6 +44,7 @@
             <artifactId>log4j-api</artifactId>
             <version>2.7</version>
         </dependency>
+
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
@@ -54,5 +56,11 @@
             <artifactId>json-lib</artifactId>
             <version>0.9</version>
         </dependency>
-    </dependencies>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.5.2</version>
+            <scope>test</scope>
+        </dependency>    </dependencies>
 </project>

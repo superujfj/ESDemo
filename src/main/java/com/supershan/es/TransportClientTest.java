@@ -209,9 +209,9 @@ public class TransportClientTest {
     }
 
     /**
-     * 更新索引
+     * 更新索引，更新刚才创建的索引，如果id相同将会覆盖掉刚才的内容
      */
-    //更新索引，更新刚才创建的索引，如果id相同将会覆盖掉刚才的内容
+
     public static void UpdateIndex() throws Exception {
         //每次添加id应该不同，相当于数据表中的主键，相同的话将会进行覆盖
         UpdateResponse response = client.update(new UpdateRequest("my_index", "_doc", "1")

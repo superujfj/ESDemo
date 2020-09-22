@@ -1,13 +1,13 @@
 package com.supershan.es;
 
 public class IndexBean {
-    //index name
     private String index;
-    //index type
-    private String indexType;
-    //index doc id
     private String docId;
-    // 1 IndexRequest 2 UpdateRequest  3 DeleteRequest
+
+    /**
+     1 IndexRequest; 2 UpdateRequest;  3 DeleteRequest
+    *
+    */
     private String operateType;
 
     public String getOperateType() {
@@ -24,14 +24,6 @@ public class IndexBean {
 
     public void setIndex(String index) {
         this.index = index;
-    }
-
-    public String getIndexType() {
-        return indexType;
-    }
-
-    public void setIndexType(String indexType) {
-        this.indexType = indexType;
     }
 
     public String getDocId() {
