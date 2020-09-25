@@ -1,8 +1,10 @@
 package com.supershan.es;
 
+import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.update.UpdateResponse;
+import org.elasticsearch.client.RequestOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +45,24 @@ class ElasticSearchUtilTest {
     }
 
     /**
-     * 创建索引
+     * 删除索引
+     * @throws IOException
+     */
+    @Test
+    void deleteIndex() throws IOException {
+        String index = "users";
+        System.out.println(esUtil.deleteIndex(index) ? "删除索引成功" : "删除索引失败");
+    }
+
+
+    @Test
+    void existsIndex() throws IOException {
+        String index = "users";
+        System.out.println(esUtil.existsIndex(index) ? "索引已存在" : "索引不存在");
+    }
+
+    /**
+     * 创建Doc
      */
     @Test
     void createDoc() throws IOException {
@@ -61,6 +80,8 @@ class ElasticSearchUtilTest {
             System.out.println("index: " + response.getIndex());
             System.out.println("id: " + response.getId());
             System.out.println("version: " + response.getVersion());
+
+            System.out.println("文档创建成功");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -71,7 +92,7 @@ class ElasticSearchUtilTest {
         String index = "users";
         String docId = "1";
 
-        GetResponse response = esUtil.getResponse(index, docId);
+        GetResponse response = esUtil.getDoc(index, docId);
 
         Map<String, Object> source = response.getSource();
         Set<String> strings = source.keySet();
@@ -80,6 +101,14 @@ class ElasticSearchUtilTest {
             String key = iterator.next();
             System.out.println(key + ":" + source.get(key));
         }
+    }
+
+    @Test
+    void existsDoc() throws IOException {
+        String index = "users";
+        String docId = "1";
+
+        System.out.println(esUtil.existsDoc(index, docId)? "文档已存在" : "文档不存在");
     }
 
     @Test
@@ -102,7 +131,12 @@ class ElasticSearchUtilTest {
 
     @Test
     void deleteDoc() throws IOException {
+        String index = "users";
+        String docId = "1";
 
+        DeleteResponse deleteResponse = esUtil.deleteDoc(index, docId);
+        System.out.println("index: " + deleteResponse.getIndex());
+        System.out.println("id: " + deleteResponse.getId());
     }
 
     @Test

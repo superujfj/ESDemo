@@ -2,8 +2,8 @@ package com.supershan.es;
 
 import org.apache.http.HttpHost;
 import org.elasticsearch.action.ActionListener;
-import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
-import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
+
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
@@ -15,14 +15,17 @@ import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.WriteRequest;
+import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.indices.CreateIndexRequest;
+import org.elasticsearch.client.indices.CreateIndexResponse;
 import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.Strings;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.query.MatchQueryBuilder;
@@ -38,7 +41,6 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
- *
  * @author mac
  */
 public class ElasticSearchUtil {
@@ -84,17 +86,67 @@ public class ElasticSearchUtil {
 
     public boolean createIndex(String index) {
         CreateIndexRequest request = new CreateIndexRequest(index);
+        boolean acknowledged = false;
         try {
+            request.settings(Settings.builder()
+                    .put("index.number_of_shards", 3)
+                    .put("index.number_of_replicas", 2)
+            );
+
+            Map<String, Object> message = new HashMap<>();
+            message.put("type", "text");
+            Map<String, Object> properties = new HashMap<>();
+            properties.put("message", message);
+            Map<String, Object> mapping = new HashMap<>();
+            mapping.put("properties", properties);
+            request.mapping(mapping);
             CreateIndexResponse indexResponse = getClient().indices().create(request, RequestOptions.DEFAULT);
 
-            return indexResponse.isAcknowledged();
+            acknowledged = indexResponse.isAcknowledged();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        return false;
+        return acknowledged;
     }
 
+    /**
+     * @param index
+     * @return
+     */
+    public boolean deleteIndex(String index) {
+        boolean acknowledged = false;
+
+        try {
+            DeleteIndexRequest request = new DeleteIndexRequest(index);
+            AcknowledgedResponse deleteIndexResponse = client.indices().delete(request, RequestOptions.DEFAULT);
+
+            acknowledged = deleteIndexResponse.isAcknowledged();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return acknowledged;
+    }
+
+
+    /**
+     * 检查索引是否存在
+     *
+     * @param index
+     * @return
+     * @throws IOException
+     */
+    public boolean existsIndex(String index) {
+        boolean isExists = false;
+        try {
+            GetIndexRequest request = new GetIndexRequest(index);
+            isExists = getClient().indices().exists(request, RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return isExists;
+    }
 
 
     private IndexRequest getIndexRequest(String index, String docId) {
@@ -133,35 +185,17 @@ public class ElasticSearchUtil {
 
 
     /**
-     * 检查索引
-     * @param index
-     * @return
-     * @throws IOException
-     */
-    public boolean checkIndexExist(String index) {
-        try {
-            GetIndexRequest request = new GetIndexRequest(index);
-            boolean isExists = getClient().indices().exists(request, RequestOptions.DEFAULT);
-            return isExists;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return false;
-    }
-
-
-    /**
      * @param index
      * @param docId
-     * @param includes  返回需要包含的字段，可以传入空
-     * @param excludes  返回需要不包含的字段，可以传入为空
-     * @param excludes  version
-     * @param excludes  versionType
+     * @param includes 返回需要包含的字段，可以传入空
+     * @param excludes 返回需要不包含的字段，可以传入为空
+     * @param excludes version
+     * @param excludes versionType
      * @return
      * @throws IOException
      */
 
-    public GetResponse getResponse(String index, String docId, String[] includes, String[] excludes, Integer version, VersionType versionType) throws IOException {
+    public GetResponse getDoc(String index, String docId, String[] includes, String[] excludes, Integer version, VersionType versionType) throws IOException {
         if (null == includes || includes.length == 0) {
             includes = Strings.EMPTY_ARRAY;
         }
@@ -189,8 +223,8 @@ public class ElasticSearchUtil {
      * @throws IOException
      */
 
-    public GetResponse getResponse(String index, String docId, String[] includes, String[] excludes) throws IOException {
-        return getResponse(index, docId, includes, excludes, null, null);
+    public GetResponse getDoc(String index, String docId, String[] includes, String[] excludes) throws IOException {
+        return getDoc(index, docId, includes, excludes, null, null);
     }
 
     /**
@@ -199,7 +233,7 @@ public class ElasticSearchUtil {
      * @return
      * @throws IOException
      */
-    public GetResponse getResponse(String index, String docId) throws IOException {
+    public GetResponse getDoc(String index, String docId) throws IOException {
         GetRequest getRequest = new GetRequest(index, docId);
         return getClient().get(getRequest, RequestOptions.DEFAULT);
     }
@@ -210,7 +244,7 @@ public class ElasticSearchUtil {
      * @return
      * @throws IOException
      */
-    public Boolean existDoc(String index, String docId) throws IOException {
+    public Boolean existsDoc(String index, String docId) throws IOException {
         GetRequest getRequest = new GetRequest(index, docId);
         getRequest.fetchSourceContext(new FetchSourceContext(false));
         getRequest.storedFields("_none_");
@@ -268,7 +302,7 @@ public class ElasticSearchUtil {
      * @return
      * @throws IOException
      */
-    public UpdateResponse updateDoc(String index,  String docId, Map<String, Object> dataMap, TimeValue timeValue, WriteRequest.RefreshPolicy refreshPolicy, Integer version, VersionType versionType, Boolean docAsUpsert, String[] includes, String[] excludes) throws IOException {
+    public UpdateResponse updateDoc(String index, String docId, Map<String, Object> dataMap, TimeValue timeValue, WriteRequest.RefreshPolicy refreshPolicy, Integer version, VersionType versionType, Boolean docAsUpsert, String[] includes, String[] excludes) throws IOException {
         UpdateRequest updateRequest = new UpdateRequest(index, docId);
         updateRequest.doc(dataMap);
         if (null != timeValue) {
@@ -393,8 +427,7 @@ public class ElasticSearchUtil {
         SearchRequest searchRequest;
         if (null == index) {
             throw new ElasticsearchException("index name must not be null");
-        }
-        else {
+        } else {
             searchRequest = new SearchRequest(index);
         }
         return searchRequest;
@@ -548,7 +581,7 @@ public class ElasticSearchUtil {
      * @param termQueryBuilder
      * @param matchQueryBuilder
      * @param sortBuilder
-     * @param fetchSource  开关
+     * @param fetchSource       开关
      * @return
      * @throws IOException
      */
