@@ -29,6 +29,8 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.query.MatchQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.TermQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
@@ -36,6 +38,7 @@ import org.elasticsearch.search.sort.SortBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.naming.directory.SearchResult;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -75,9 +78,9 @@ public class ElasticSearchUtil {
     }
 
     public void close() throws IOException {
-        if (client != null) {
+        if (this.client != null) {
             try {
-                client.close();
+                this.client.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -119,7 +122,7 @@ public class ElasticSearchUtil {
 
         try {
             DeleteIndexRequest request = new DeleteIndexRequest(index);
-            AcknowledgedResponse deleteIndexResponse = client.indices().delete(request, RequestOptions.DEFAULT);
+            AcknowledgedResponse deleteIndexResponse = getClient().indices().delete(request, RequestOptions.DEFAULT);
 
             acknowledged = deleteIndexResponse.isAcknowledged();
         } catch (IOException e) {
@@ -359,6 +362,19 @@ public class ElasticSearchUtil {
         return updateDoc(index, docId, dataMap, null, null, null, null, false, null, null);
     }
 
+
+    public BulkResponse bulkDocs(String index, List<Map<String, Object>> list) throws IOException {
+
+        BulkRequest request = new BulkRequest();
+
+        for (Map map: list) {
+           request.add(getIndexRequest(index, String.valueOf(map.get("id"))).source(map));
+        }
+
+        return getClient().bulk(request, RequestOptions.DEFAULT);
+    }
+
+
     /**
      * 批量操作
      *
@@ -368,7 +384,7 @@ public class ElasticSearchUtil {
      * @return
      * @throws IOException
      */
-    public BulkResponse bulkRequest(List<IndexBean> indexBeanList, TimeValue timeValue, WriteRequest.RefreshPolicy refreshPolicy) throws IOException {
+    public BulkResponse bulkResponse(List<IndexBean> indexBeanList, TimeValue timeValue, WriteRequest.RefreshPolicy refreshPolicy) throws IOException {
         BulkRequest bulkRequest = getBulkRequest(indexBeanList);
         if (null != timeValue) {
             bulkRequest.timeout(timeValue);
@@ -402,16 +418,6 @@ public class ElasticSearchUtil {
     }
 
     /**
-     * 批量操作
-     *
-     * @param indexBeanList
-     * @return
-     */
-    public BulkResponse bulkRequest(List<IndexBean> indexBeanList) throws IOException {
-        return bulkRequest(indexBeanList, null, null);
-    }
-
-    /**
      * 批量异步操作
      *
      * @param indexBeanList
@@ -430,6 +436,10 @@ public class ElasticSearchUtil {
         } else {
             searchRequest = new SearchRequest(index);
         }
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.matchAllQuery());
+        searchRequest.source(searchSourceBuilder);
+
         return searchRequest;
     }
 
@@ -442,25 +452,38 @@ public class ElasticSearchUtil {
         return getClient().search(getSearchRequest(index), RequestOptions.DEFAULT);
     }
 
+
+    public SearchResponse searchResponse(SearchRequest request) throws IOException {
+        return getClient().search(request, RequestOptions.DEFAULT);
+    }
+
     /**
+     *
+     * @description
      * @param index
      * @param from
      * @param size
-     * @param termQueryBuilder
-     * @return
-     * @throws IOException
+     * @param queryBuilder
+     * @return org.elasticsearch.action.search.SearchResponse
+     * @author shantao
+     * @date 2020/9/25 7:20 下午
      */
-    public SearchResponse searchResponse(String index, Integer from, Integer size, TermQueryBuilder termQueryBuilder) throws IOException {
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, termQueryBuilder, null, null, null)), RequestOptions.DEFAULT);
+    public SearchResponse searchResponse(String index, Integer from, Integer size, QueryBuilder queryBuilder) throws IOException {
+        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(from, size, queryBuilder, null, null, null)), RequestOptions.DEFAULT);
     }
 
-    private SearchSourceBuilder getSearchSourceBuilder(String index, Integer from, Integer size, TermQueryBuilder termQueryBuilder, String sortField, SortBuilder sortBuilder, Boolean fetchSource) {
+    private SearchSourceBuilder getSearchSourceBuilder(Integer from, Integer size, QueryBuilder queryBuilder, String sortField, SortBuilder sortBuilder, Boolean fetchSource) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        if (null != termQueryBuilder) {
-            searchSourceBuilder.query(termQueryBuilder);
+        if (null != queryBuilder) {
+            searchSourceBuilder.query(queryBuilder);
         }
-        searchSourceBuilder.from(from);
-        searchSourceBuilder.size(size);
+
+        if (null != from) {
+            searchSourceBuilder.from(from);
+        }
+        if (null != size) {
+            searchSourceBuilder.size(size);
+        }
         if (null != sortField) {
             searchSourceBuilder.sort(sortField);
         }
@@ -479,16 +502,16 @@ public class ElasticSearchUtil {
      * @param index
      * @param from
      * @param size
-     * @param termQueryBuilder
+     * @param queryBuilder
      * @param matchQueryBuilder
      * @return
      * @throws IOException
      */
-    public SearchResponse searchResponse(String index, Integer from, Integer size, TermQueryBuilder termQueryBuilder, MatchQueryBuilder matchQueryBuilder) throws IOException {
+    public SearchResponse searchResponse(String index, Integer from, Integer size, QueryBuilder queryBuilder, MatchQueryBuilder matchQueryBuilder) throws IOException {
         if (null == matchQueryBuilder) {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, termQueryBuilder, null, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
+        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(from, size, queryBuilder, null, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
     }
 
     /**
@@ -503,7 +526,7 @@ public class ElasticSearchUtil {
         if (null == matchQueryBuilder) {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, null, null, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
+        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(from, size, null, null, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
     }
 
     /**
@@ -519,7 +542,7 @@ public class ElasticSearchUtil {
         if (null == matchQueryBuilder) {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, null, sortField, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
+        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(from, size, null, sortField, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
     }
 
     /**
@@ -536,23 +559,7 @@ public class ElasticSearchUtil {
         if (null == matchQueryBuilder) {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, null, sortField, null, fetchSource).query(matchQueryBuilder)), RequestOptions.DEFAULT);
-    }
-
-    /**
-     * @param index
-     * @param from
-     * @param size
-     * @param matchQueryBuilder
-     * @param sortBuilder
-     * @return
-     * @throws IOException
-     */
-    public SearchResponse searchResponse(String index, Integer from, Integer size, MatchQueryBuilder matchQueryBuilder, SortBuilder sortBuilder) throws IOException {
-        if (null == matchQueryBuilder) {
-            throw new ElasticsearchException("matchQueryBuilder is null");
-        }
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, null, null, sortBuilder, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
+        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(from, size, null, sortField, null, fetchSource).query(matchQueryBuilder)), RequestOptions.DEFAULT);
     }
 
     /**
@@ -571,26 +578,9 @@ public class ElasticSearchUtil {
         if (null == matchQueryBuilder) {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, termQueryBuilder, sortField, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
+        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(from, size, termQueryBuilder, sortField, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
     }
 
-    /**
-     * @param index
-     * @param from
-     * @param size
-     * @param termQueryBuilder
-     * @param matchQueryBuilder
-     * @param sortBuilder
-     * @param fetchSource       开关
-     * @return
-     * @throws IOException
-     */
-    public SearchResponse searchResponse(String index, Integer from, Integer size, TermQueryBuilder termQueryBuilder, MatchQueryBuilder matchQueryBuilder, SortBuilder sortBuilder, Boolean fetchSource) throws IOException {
-        if (null == matchQueryBuilder) {
-            throw new ElasticsearchException("matchQueryBuilder is null");
-        }
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, termQueryBuilder, null, sortBuilder, fetchSource).query(matchQueryBuilder)), RequestOptions.DEFAULT);
-    }
 
     /**
      * @param index
@@ -606,7 +596,7 @@ public class ElasticSearchUtil {
         if (null == matchQueryBuilder) {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, termQueryBuilder, null, sortBuilder, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
+        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(from, size, termQueryBuilder, null, sortBuilder, null).query(matchQueryBuilder)), RequestOptions.DEFAULT);
     }
 
     /**
@@ -624,7 +614,7 @@ public class ElasticSearchUtil {
         if (null == matchQueryBuilder) {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
-        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, termQueryBuilder, sortField, null, fetchSource).query(matchQueryBuilder)), RequestOptions.DEFAULT);
+        return getClient().search(getSearchRequest(index).source(getSearchSourceBuilder(from, size, termQueryBuilder, sortField, null, fetchSource).query(matchQueryBuilder)), RequestOptions.DEFAULT);
     }
 
     /**
@@ -644,7 +634,7 @@ public class ElasticSearchUtil {
         if (null == matchQueryBuilder) {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
-        getClient().searchAsync(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, termQueryBuilder, null, sortBuilder, null).query(matchQueryBuilder)), RequestOptions.DEFAULT, listener);
+        getClient().searchAsync(getSearchRequest(index).source(getSearchSourceBuilder(from, size, termQueryBuilder, null, sortBuilder, null).query(matchQueryBuilder)), RequestOptions.DEFAULT, listener);
     }
 
     /**
@@ -663,6 +653,10 @@ public class ElasticSearchUtil {
         if (null == matchQueryBuilder) {
             throw new ElasticsearchException("matchQueryBuilder is null");
         }
-        getClient().searchAsync(getSearchRequest(index).source(getSearchSourceBuilder(index, from, size, termQueryBuilder, sortField, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT, listener);
+        getClient().searchAsync(getSearchRequest(index).source(getSearchSourceBuilder(from, size, termQueryBuilder, sortField, null, null).query(matchQueryBuilder)), RequestOptions.DEFAULT, listener);
     }
+
+
+
+
 }

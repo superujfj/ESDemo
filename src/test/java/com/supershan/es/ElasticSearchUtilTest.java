@@ -1,10 +1,23 @@
 package com.supershan.es;
 
+import org.elasticsearch.action.bulk.BulkItemResponse;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.common.unit.Fuzziness;
+import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.index.query.MatchQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.FieldSortBuilder;
+import org.elasticsearch.search.sort.ScoreSortBuilder;
+import org.elasticsearch.search.sort.SortOrder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,10 +26,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @DisplayName("My first test case")
 class ElasticSearchUtilTest {
@@ -46,6 +57,7 @@ class ElasticSearchUtilTest {
 
     /**
      * 删除索引
+     *
      * @throws IOException
      */
     @Test
@@ -108,7 +120,7 @@ class ElasticSearchUtilTest {
         String index = "users";
         String docId = "1";
 
-        System.out.println(esUtil.existsDoc(index, docId)? "文档已存在" : "文档不存在");
+        System.out.println(esUtil.existsDoc(index, docId) ? "文档已存在" : "文档不存在");
     }
 
     @Test
@@ -140,7 +152,115 @@ class ElasticSearchUtilTest {
     }
 
     @Test
-    void searchDoc() throws IOException {
+    void bulkDocs() throws IOException {
+        String index = "users";
+        String docId = "1";
 
+        Map<String, Object> jsonMap1 = new HashMap<>();
+        jsonMap1.put("id", "1");
+        jsonMap1.put("name", "A");
+        jsonMap1.put("subject", "English");
+        jsonMap1.put("score", 90);
+        jsonMap1.put("password", "B2020");
+
+        Map<String, Object> jsonMap2 = new HashMap<>();
+        jsonMap2.put("id", "2");
+        jsonMap2.put("name", "B");
+        jsonMap2.put("subject", "English");
+        jsonMap2.put("score", 100);
+        jsonMap2.put("password", "B2020");
+
+        Map<String, Object> jsonMap3 = new HashMap<>();
+        jsonMap3.put("id", "3");
+        jsonMap3.put("name", "C");
+        jsonMap3.put("subject", "Chinese");
+        jsonMap3.put("score", 80);
+        jsonMap3.put("password", "C2020");
+
+        List list = new ArrayList();
+
+        list.add(jsonMap1);
+        list.add(jsonMap2);
+        list.add(jsonMap3);
+
+        BulkResponse response = esUtil.bulkDocs(index, list);
+
+        Iterator<BulkItemResponse> iterator = response.iterator();
+        while (iterator.hasNext()) {
+            BulkItemResponse itemResponse = iterator.next();
+
+            System.out.println("id: " + itemResponse.getId());
+        }
+    }
+
+
+    @Test
+    void searchDocByIndex() throws IOException {
+        String index = "users";
+        SearchResponse response = esUtil.searchResponse(index);
+
+        System.out.println("response: " + format(response.toString()));
+    }
+
+    @Test
+    void searchDocByMatch() throws IOException {
+        String index = "users";
+
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+        MatchQueryBuilder matchQueryBuilder = new MatchQueryBuilder("name", "C");
+        sourceBuilder.query(matchQueryBuilder); // 设置搜索，可以是任何类型的 QueryBuilder
+        sourceBuilder.from(0); // 起始 index
+        sourceBuilder.size(5); // 大小 size
+        sourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
+
+        SearchRequest searchRequest = new SearchRequest(index);
+        searchRequest.source(sourceBuilder);
+
+        SearchResponse response = esUtil.searchResponse(searchRequest);
+        System.out.println("response: " + format(response.toString()));
+    }
+
+
+
+    public static String format(String jsonStr) {
+        int level = 0;
+        StringBuffer jsonForMatStr = new StringBuffer();
+        for (int i = 0; i < jsonStr.length(); i++) {
+            char c = jsonStr.charAt(i);
+            if (level > 0 && '\n' == jsonForMatStr.charAt(jsonForMatStr.length() - 1)) {
+                jsonForMatStr.append(getLevelStr(level));
+            }
+            switch (c) {
+                case '{':
+                case '[':
+                    jsonForMatStr.append(c + "\n");
+                    level++;
+                    break;
+                case ',':
+                    jsonForMatStr.append(c + "\n");
+                    break;
+                case '}':
+                case ']':
+                    jsonForMatStr.append("\n");
+                    level--;
+                    jsonForMatStr.append(getLevelStr(level));
+                    jsonForMatStr.append(c);
+                    break;
+                default:
+                    jsonForMatStr.append(c);
+                    break;
+            }
+        }
+
+        return jsonForMatStr.toString();
+
+    }
+
+    private static String getLevelStr(int level) {
+        StringBuffer levelStr = new StringBuffer();
+        for (int levelI = 0; levelI < level; levelI++) {
+            levelStr.append("\t");
+        }
+        return levelStr.toString();
     }
 }
