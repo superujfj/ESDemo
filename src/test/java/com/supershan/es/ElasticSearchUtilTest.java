@@ -11,9 +11,7 @@ import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.common.unit.Fuzziness;
 import org.elasticsearch.common.unit.TimeValue;
-import org.elasticsearch.index.query.MatchQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.*;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.elasticsearch.search.sort.ScoreSortBuilder;
@@ -159,23 +157,26 @@ class ElasticSearchUtilTest {
         Map<String, Object> jsonMap1 = new HashMap<>();
         jsonMap1.put("id", "1");
         jsonMap1.put("name", "A");
-        jsonMap1.put("subject", "English");
+        jsonMap1.put("subject", "English lesson");
         jsonMap1.put("score", 90);
-        jsonMap1.put("password", "B2020");
+        jsonMap1.put("password", "A2020");
+        jsonMap1.put("birthday", "2020-01-01");
 
         Map<String, Object> jsonMap2 = new HashMap<>();
         jsonMap2.put("id", "2");
         jsonMap2.put("name", "B");
-        jsonMap2.put("subject", "English");
+        jsonMap2.put("subject", "English lesson");
         jsonMap2.put("score", 100);
         jsonMap2.put("password", "B2020");
+        jsonMap2.put("birthday", "2020-06-01");
 
         Map<String, Object> jsonMap3 = new HashMap<>();
         jsonMap3.put("id", "3");
         jsonMap3.put("name", "C");
-        jsonMap3.put("subject", "Chinese");
+        jsonMap3.put("subject", "Chinese lesson");
         jsonMap3.put("score", 80);
         jsonMap3.put("password", "C2020");
+        jsonMap3.put("birthday", "2020-07-01");
 
         List list = new ArrayList();
 
@@ -195,7 +196,7 @@ class ElasticSearchUtilTest {
 
 
     @Test
-    void searchDocByIndex() throws IOException {
+    void searchByIndex() throws IOException {
         String index = "users";
         SearchResponse response = esUtil.searchResponse(index);
 
@@ -203,24 +204,57 @@ class ElasticSearchUtilTest {
     }
 
     @Test
-    void searchDocByMatch() throws IOException {
+    void matchSearch() throws IOException {
         String index = "users";
+        SearchRequest searchRequest = new SearchRequest(index);
 
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
         MatchQueryBuilder matchQueryBuilder = new MatchQueryBuilder("name", "C");
         sourceBuilder.query(matchQueryBuilder); // 设置搜索，可以是任何类型的 QueryBuilder
-        sourceBuilder.from(0); // 起始 index
-        sourceBuilder.size(5); // 大小 size
         sourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
 
-        SearchRequest searchRequest = new SearchRequest(index);
         searchRequest.source(sourceBuilder);
 
         SearchResponse response = esUtil.searchResponse(searchRequest);
         System.out.println("response: " + format(response.toString()));
     }
 
+    @Test
+    void fuzzySearch() throws IOException {
+        String index = "users";
+        SearchRequest searchRequest = new SearchRequest(index);
+        BoolQueryBuilder boolBuilder = QueryBuilders.boolQuery();
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
 
+        MatchQueryBuilder matchQueryBuilder = QueryBuilders.matchQuery("subject", "lesson");
+        matchQueryBuilder.fuzziness();
+        boolBuilder.must(matchQueryBuilder);
+
+        sourceBuilder.query(boolBuilder);
+
+        searchRequest.source(sourceBuilder);
+        SearchResponse response = esUtil.searchResponse(searchRequest);
+        System.out.println("response: " + format(response.toString()));
+    }
+
+    @Test
+    void sortSearch() throws IOException {
+        String index = "users";
+        SearchRequest searchRequest = new SearchRequest(index);
+        BoolQueryBuilder boolBuilder = QueryBuilders.boolQuery();
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+        RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery("birthday");
+        rangeQueryBuilder.gte("2020-01-01"); //开始时间
+        rangeQueryBuilder.lte("2020-06-30"); //结束时间
+        boolBuilder.must(rangeQueryBuilder);
+
+        sourceBuilder.sort(new FieldSortBuilder("name").order(SortOrder.DESC));
+        sourceBuilder.query(boolBuilder);
+
+        searchRequest.source(sourceBuilder);
+        SearchResponse response = esUtil.searchResponse(searchRequest);
+        System.out.println("response: " + format(response.toString()));
+    }
 
     public static String format(String jsonStr) {
         int level = 0;
