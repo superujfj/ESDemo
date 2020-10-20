@@ -8,13 +8,13 @@ import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.update.UpdateResponse;
-import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.common.unit.Fuzziness;
 import org.elasticsearch.common.unit.TimeValue;
-import org.elasticsearch.index.query.*;
+import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.MatchQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
-import org.elasticsearch.search.sort.ScoreSortBuilder;
 import org.elasticsearch.search.sort.SortOrder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +32,6 @@ class ElasticSearchUtilTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(ElasticSearchUtilTest.class);
     ElasticSearchUtil esUtil = null;
 
-
     @BeforeEach
     void setUp() {
         esUtil = new ElasticSearchUtil(new String[]{"127.0.0.1:9200"});
@@ -48,18 +47,17 @@ class ElasticSearchUtilTest {
      */
 
     @Test
-    void createIndex() throws IOException {
+    void createIndex() {
         String index = "users";
         System.out.println(esUtil.createIndex(index) ? "创建索引成功" : "创建索引失败");
     }
 
     /**
-     * 删除索引
      *
-     * @throws IOException
+     *
      */
     @Test
-    void deleteIndex() throws IOException {
+    void deleteIndex() {
         String index = "users";
         System.out.println(esUtil.deleteIndex(index) ? "删除索引成功" : "删除索引失败");
     }
@@ -106,9 +104,7 @@ class ElasticSearchUtilTest {
 
         Map<String, Object> source = response.getSource();
         Set<String> strings = source.keySet();
-        Iterator<String> iterator = strings.iterator();
-        while (iterator.hasNext()) {
-            String key = iterator.next();
+        for (String key : strings) {
             System.out.println(key + ":" + source.get(key));
         }
     }
@@ -152,7 +148,6 @@ class ElasticSearchUtilTest {
     @Test
     void bulkDocs() throws IOException {
         String index = "users";
-        String docId = "1";
 
         Map<String, Object> jsonMap1 = new HashMap<>();
         jsonMap1.put("id", "1");
@@ -178,7 +173,7 @@ class ElasticSearchUtilTest {
         jsonMap3.put("password", "C2020");
         jsonMap3.put("birthday", "2020-07-01");
 
-        List list = new ArrayList();
+        ArrayList list = new ArrayList();
 
         list.add(jsonMap1);
         list.add(jsonMap2);
@@ -186,10 +181,7 @@ class ElasticSearchUtilTest {
 
         BulkResponse response = esUtil.bulkDocs(index, list);
 
-        Iterator<BulkItemResponse> iterator = response.iterator();
-        while (iterator.hasNext()) {
-            BulkItemResponse itemResponse = iterator.next();
-
+        for (BulkItemResponse itemResponse : response) {
             System.out.println("id: " + itemResponse.getId());
         }
     }
@@ -258,7 +250,7 @@ class ElasticSearchUtilTest {
 
     public static String format(String jsonStr) {
         int level = 0;
-        StringBuffer jsonForMatStr = new StringBuffer();
+        StringBuilder jsonForMatStr = new StringBuilder();
         for (int i = 0; i < jsonStr.length(); i++) {
             char c = jsonStr.charAt(i);
             if (level > 0 && '\n' == jsonForMatStr.charAt(jsonForMatStr.length() - 1)) {
@@ -267,11 +259,11 @@ class ElasticSearchUtilTest {
             switch (c) {
                 case '{':
                 case '[':
-                    jsonForMatStr.append(c + "\n");
+                    jsonForMatStr.append(c).append("\n");
                     level++;
                     break;
                 case ',':
-                    jsonForMatStr.append(c + "\n");
+                    jsonForMatStr.append(c).append("\n");
                     break;
                 case '}':
                 case ']':
@@ -291,7 +283,7 @@ class ElasticSearchUtilTest {
     }
 
     private static String getLevelStr(int level) {
-        StringBuffer levelStr = new StringBuffer();
+        StringBuilder levelStr = new StringBuilder();
         for (int levelI = 0; levelI < level; levelI++) {
             levelStr.append("\t");
         }
