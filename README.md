@@ -2,4 +2,4 @@
 This is a demo program of Elastic Search. Please feel free to download it. 
 
 # supershan
-First readme
+This is a first readme created by Tao.
